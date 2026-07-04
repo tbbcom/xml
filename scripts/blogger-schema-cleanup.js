@@ -20,7 +20,9 @@ function parseArgs(argv) {
     else if (arg.startsWith('--confirm-blog-id=')) args.confirmBlogId = arg.slice(18);
     else if (arg.startsWith('--post-ids=')) args.postIds = arg.slice(11).split(',').map((v) => v.trim()).filter(Boolean);
   }
-  if (!Number.isInteger(args.max) || args.max < 1 || args.max > 25) throw new Error('--max must be an integer from 1 to 25');
+  if (!Number.isInteger(args.max) || args.max < 1 || args.max > 25) {
+    throw new Error('--max must be an integer from 1 to 25');
+  }
   return args;
 }
 
@@ -31,12 +33,13 @@ function getTypes(node) {
 
 function removeArticleNodes(value) {
   if (Array.isArray(value)) {
-    if (value.length === 0) return value;
+    if (value.length === 0) return [];
     const kept = value.map(removeArticleNodes).filter((item) => item !== undefined);
     return kept.length ? kept : undefined;
   }
   if (!value || typeof value !== 'object') return value;
   if (getTypes(value).some((type) => ARTICLE_TYPES.has(type))) return undefined;
+
   const output = {};
   for (const [key, child] of Object.entries(value)) {
     const cleaned = removeArticleNodes(child);
@@ -46,19 +49,39 @@ function removeArticleNodes(value) {
 }
 
 function decodeEntities(value) {
-function decodeEntities(value) {
   return String(value || '')
-    .replace(/&amp;/g, '&')
     .replace(/&quot;/g, '"').replace(/&#34;/g, '"')
     .replace(/&apos;/g, "'").replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<').replace(/&gt;/g, '>');
-}
 }
 
 function cleanJsonLd(html) {
   const changes = [];
   const re = /<script\b([^>]*)type\s*=\s*['"]application\/ld\+json['"]([^>]*)>([\s\S]*?)<\/script>/gi;
-67:    return `<script${before}type="application/ld+json"${after}>${JSON.stringify(cleaned, null, 2)}</script>`.replace(/<\/script/gi, '<\\/script');
+  const cleanedHtml = String(html || '').replace(re, (full, before, after, raw) => {
+    let parsed;
+    try {
+      parsed = JSON.parse(decodeEntities(raw).trim());
+    } catch {
+      return full;
+    }
+
+    const cleaned = removeArticleNodes(parsed);
+    if (cleaned === undefined) {
+      changes.push({ action: 'remove-block', removedTypes: getTypes(parsed) });
+      return '';
+    }
+
+    const beforeJson = JSON.stringify(parsed);
+    const afterJson = JSON.stringify(cleaned);
+    if (beforeJson === afterJson) return full;
+
+    changes.push({ action: 'rewrite-block', removedTypes: ['Article/BlogPosting/NewsArticle'] });
+    const safeJson = JSON.stringify(cleaned, null, 2).replace(/<\/script/gi, '<\\/script');
+    return `<script${before}type="application/ld+json"${after}>${safeJson}</script>`;
+  });
+
   return { cleanedHtml, changes };
 }
 
@@ -69,35 +92,57 @@ async function request(url, options = {}) {
 }
 
 async function getAccessToken() {
-  for (const [name, value] of Object.entries({ BLOGGER_CLIENT_ID: CLIENT_ID, BLOGGER_CLIENT_SECRET: CLIENT_SECRET, BLOGGER_REFRESH_TOKEN: REFRESH_TOKEN })) {
+  for (const [name, value] of Object.entries({
+    BLOGGER_CLIENT_ID: CLIENT_ID,
+    BLOGGER_CLIENT_SECRET: CLIENT_SECRET,
+    BLOGGER_REFRESH_TOKEN: REFRESH_TOKEN
+  })) {
     if (!value) throw new Error(`${name} is required for OAuth access`);
   }
-  const body = new URLSearchParams({ client_id: CLIENT_ID, client_secret: CLIENT_SECRET, refresh_token: REFRESH_TOKEN, grant_type: 'refresh_token' });
-  const token = await request(TOKEN_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+
+  const body = new URLSearchParams({
+    client_id: CLIENT_ID,
+    client_secret: CLIENT_SECRET,
+    refresh_token: REFRESH_TOKEN,
+    grant_type: 'refresh_token'
+  });
+  const token = await request(TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body
+  });
   return token.access_token;
 }
 
 async function* listPosts(accessToken, postIds) {
   if (postIds.length) {
-    const posts = await Promise.all(postIds.map((id) => request(`${API_ROOT}/blogs/${BLOG_ID}/posts/${id}`, { headers: { Authorization: `Bearer ${accessToken}` } })));
+    const posts = await Promise.all(postIds.map((id) => request(
+      `${API_ROOT}/blogs/${BLOG_ID}/posts/${id}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    )));
     yield* posts;
     return;
   }
+
   let pageToken = '';
   do {
     const params = new URLSearchParams({ fetchBodies: 'true', status: 'live', maxResults: '500' });
     if (pageToken) params.set('pageToken', pageToken);
-    const page = await request(`${API_ROOT}/blogs/${BLOG_ID}/posts?${params}`, { headers: { Authorization: `Bearer ${accessToken}` } });
-    yield* page.items || [];
+    const page = await request(`${API_ROOT}/blogs/${BLOG_ID}/posts?${params}`, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    yield* (page.items || []);
     pageToken = page.nextPageToken || '';
   } while (pageToken);
 }
 
 async function updatePost(accessToken, post, content) {
-  const url = `${API_ROOT}/blogs/${BLOG_ID}/posts/${post.id}`;
-  return request(url, {
+  return request(`${API_ROOT}/blogs/${BLOG_ID}/posts/${post.id}`, {
     method: 'PATCH',
-    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    },
     body: JSON.stringify({ content })
   });
 }
@@ -105,7 +150,9 @@ async function updatePost(accessToken, post, content) {
 function ensureApplySafety(args) {
   if (!args.apply) return;
   if (!BLOG_ID) throw new Error('BLOGGER_BLOG_ID is required');
-  if (args.confirmBlogId !== BLOG_ID) throw new Error('Apply blocked: --confirm-blog-id must exactly match BLOGGER_BLOG_ID');
+  if (args.confirmBlogId !== BLOG_ID) {
+    throw new Error('Apply blocked: --confirm-blog-id must exactly match BLOGGER_BLOG_ID');
+  }
   if (args.max > 5) throw new Error('First apply is limited to 5 posts');
 }
 
@@ -113,6 +160,7 @@ async function main() {
   const args = parseArgs(process.argv);
   ensureApplySafety(args);
   if (!BLOG_ID) throw new Error('BLOGGER_BLOG_ID is required');
+
   const token = await getAccessToken();
   const candidates = [];
   for await (const post of listPosts(token, args.postIds)) {
@@ -132,7 +180,13 @@ async function main() {
   for (const { post, result } of candidates) {
     fs.writeFileSync(path.join(runDir, `${post.id}.before.html`), post.content || '');
     fs.writeFileSync(path.join(runDir, `${post.id}.after.html`), result.cleanedHtml);
-    const item = { id: post.id, title: post.title, url: post.url, changes: result.changes, applied: false };
+    const item = {
+      id: post.id,
+      title: post.title,
+      url: post.url,
+      changes: result.changes,
+      applied: false
+    };
     if (args.apply) {
       await updatePost(token, post, result.cleanedHtml);
       item.applied = true;
@@ -140,10 +194,24 @@ async function main() {
     manifest.push(item);
   }
 
-  fs.writeFileSync(path.join(runDir, 'manifest.json'), JSON.stringify({ mode: args.apply ? 'apply' : 'dry-run', blogId: BLOG_ID, generatedAt: new Date().toISOString(), posts: manifest }, null, 2));
+  fs.writeFileSync(
+    path.join(runDir, 'manifest.json'),
+    JSON.stringify({
+      mode: args.apply ? 'apply' : 'dry-run',
+      blogId: BLOG_ID,
+      generatedAt: new Date().toISOString(),
+      posts: manifest
+    }, null, 2)
+  );
+
   console.log(`${args.apply ? 'Applied' : 'Dry-run generated for'} ${manifest.length} posts. Output: ${runDir}`);
 }
 
-if (require.main === module) main().catch((error) => { console.error(error.message); process.exitCode = 1; });
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
+}
 
 module.exports = { parseArgs, getTypes, removeArticleNodes, cleanJsonLd, ensureApplySafety };
