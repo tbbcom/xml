@@ -111,6 +111,6 @@ test('production canonical and hreflang consistently use canonical URL object', 
 
 test('production template does not contain insecure HTTP asset URLs', () => {
     const xml = loadProductionTemplate();
-    const insecureAssets = [...xml.matchAll(/(?:src|href)=['"]http:\/\/[^'"]+['"]/g)].map((m) => m[0]);
+    const insecureAssets = [...xml.matchAll(/(?:src|href)\s*=\s*['"]http:\/\/[^'"]+['"]/g)].map((m) => m[0]);
     assert.deepEqual(insecureAssets, [], `Found insecure asset URLs: ${insecureAssets.join(', ')}`);
 });
