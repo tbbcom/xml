@@ -48,21 +48,22 @@ function removeArticleNodes(value) {
   return Object.keys(output).length ? output : undefined;
 }
 
-function decodeEntities(value) {
-  return String(value || '')
-    .replace(/&quot;/g, '"').replace(/&#34;/g, '"')
-    .replace(/&apos;/g, "'").replace(/&#39;/g, "'")
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+function serializeJsonLd(value) {
+  return JSON.stringify(value, null, 2)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
 }
 
 function cleanJsonLd(html) {
   const changes = [];
-  const re = /<script\b([^>]*)type\s*=\s*['"]application\/ld\+json['"]([^>]*)>([\s\S]*?)<\/script>/gi;
-  const cleanedHtml = String(html || '').replace(re, (full, before, after, raw) => {
+  const re = /<script\b[^>]*type\s*=\s*['"]application\/ld\+json['"][^>]*>([\s\S]*?)<\/script>/gi;
+  const cleanedHtml = String(html || '').replace(re, (full, raw) => {
     let parsed;
     try {
-      parsed = JSON.parse(decodeEntities(raw).trim());
+      parsed = JSON.parse(raw.trim());
     } catch {
       return full;
     }
@@ -73,13 +74,10 @@ function cleanJsonLd(html) {
       return '';
     }
 
-    const beforeJson = JSON.stringify(parsed);
-    const afterJson = JSON.stringify(cleaned);
-    if (beforeJson === afterJson) return full;
+    if (JSON.stringify(parsed) === JSON.stringify(cleaned)) return full;
 
     changes.push({ action: 'rewrite-block', removedTypes: ['Article/BlogPosting/NewsArticle'] });
-    const safeJson = JSON.stringify(cleaned, null, 2).replace(/<\/script/gi, '<\\/script');
-    return `<script${before}type="application/ld+json"${after}>${safeJson}</script>`;
+    return `<script type="application/ld+json">${serializeJsonLd(cleaned)}</script>`;
   });
 
   return { cleanedHtml, changes };
@@ -214,4 +212,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseArgs, getTypes, removeArticleNodes, cleanJsonLd, ensureApplySafety };
+module.exports = { parseArgs, getTypes, removeArticleNodes, serializeJsonLd, cleanJsonLd, ensureApplySafety };
