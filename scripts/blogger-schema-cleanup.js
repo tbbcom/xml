@@ -48,15 +48,6 @@ function removeArticleNodes(value) {
   return Object.keys(output).length ? output : undefined;
 }
 
-function serializeJsonLd(value) {
-  return JSON.stringify(value, null, 2)
-    .replace(/</g, '\\u003c')
-    .replace(/>/g, '\\u003e')
-    .replace(/&/g, '\\u0026')
-    .replace(/\u2028/g, '\\u2028')
-    .replace(/\u2029/g, '\\u2029');
-}
-
 function cleanJsonLd(html) {
   const changes = [];
   const re = /<script\b[^>]*type\s*=\s*['"]application\/ld\+json['"][^>]*>([\s\S]*?)<\/script>/gi;
@@ -74,10 +65,15 @@ function cleanJsonLd(html) {
       return '';
     }
 
-    if (JSON.stringify(parsed) === JSON.stringify(cleaned)) return full;
+    if (JSON.stringify(parsed) !== JSON.stringify(cleaned)) {
+      changes.push({
+        action: 'manual-review',
+        reason: 'mixed-schema-block',
+        removedTypes: ['Article/BlogPosting/NewsArticle']
+      });
+    }
 
-    changes.push({ action: 'rewrite-block', removedTypes: ['Article/BlogPosting/NewsArticle'] });
-    return `<script type="application/ld+json">${serializeJsonLd(cleaned)}</script>`;
+    return full;
   });
 
   return { cleanedHtml, changes };
@@ -163,8 +159,10 @@ async function main() {
   const candidates = [];
   for await (const post of listPosts(token, args.postIds)) {
     const result = cleanJsonLd(post.content || '');
-    if (result.changes.length) {
-      candidates.push({ post, result });
+    const hasAutomaticChange = result.cleanedHtml !== (post.content || '');
+    const hasReviewFinding = result.changes.length > 0;
+    if (hasAutomaticChange || hasReviewFinding) {
+      candidates.push({ post, result, hasAutomaticChange });
       if (candidates.length >= args.max) break;
     }
   }
@@ -175,7 +173,7 @@ async function main() {
   fs.mkdirSync(runDir, { recursive: true });
   const manifest = [];
 
-  for (const { post, result } of candidates) {
+  for (const { post, result, hasAutomaticChange } of candidates) {
     fs.writeFileSync(path.join(runDir, `${post.id}.before.html`), post.content || '');
     fs.writeFileSync(path.join(runDir, `${post.id}.after.html`), result.cleanedHtml);
     const item = {
@@ -183,9 +181,10 @@ async function main() {
       title: post.title,
       url: post.url,
       changes: result.changes,
+      automaticChange: hasAutomaticChange,
       applied: false
     };
-    if (args.apply) {
+    if (args.apply && hasAutomaticChange) {
       await updatePost(token, post, result.cleanedHtml);
       item.applied = true;
     }
@@ -212,4 +211,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseArgs, getTypes, removeArticleNodes, serializeJsonLd, cleanJsonLd, ensureApplySafety };
+module.exports = { parseArgs, getTypes, removeArticleNodes, cleanJsonLd, ensureApplySafety };
