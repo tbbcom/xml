@@ -12,7 +12,7 @@ test('removes standalone Article schema block', () => {
   assert.equal(result.cleanedHtml.includes('<p>Hello</p>'), true);
 });
 
-test('preserves FAQPage while removing Article from @graph', () => {
+test('preserves FAQPage while removing Article from object graph', () => {
   const input = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -35,15 +35,22 @@ test('leaves invalid JSON-LD unchanged', () => {
 test('preserves empty arrays in non-removed schema', () => {
   const input = {
     '@type': 'FAQPage',
-    'mainEntity': []
+    mainEntity: []
   };
   const cleaned = removeArticleNodes(input);
-  assert.deepEqual(cleaned, { '@type': 'FAQPage', 'mainEntity': [] });
+  assert.deepEqual(cleaned, { '@type': 'FAQPage', mainEntity: [] });
 });
 
-test('decodes HTML entities in JSON-LD blocks', () => {
-  const html = '<p>Hello</p><script type="application/ld+json">{"@type":"Article","headline":"X"}</script>';
+test('leaves mixed schema script unchanged and flags manual review', () => {
+  const html = '<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Article","headline":"X"},{"@type":"FAQPage","mainEntity":[]}]}</script>';
   const result = cleanJsonLd(html);
+  assert.equal(result.cleanedHtml, html);
   assert.equal(result.changes.length, 1);
-  assert.equal(result.cleanedHtml.includes('Article'), false);
+  assert.equal(result.changes[0].action, 'manual-review');
+});
+
+test('defaults to dry-run and five posts', () => {
+  const args = parseArgs(['node', 'script']);
+  assert.equal(args.apply, false);
+  assert.equal(args.max, 5);
 });
