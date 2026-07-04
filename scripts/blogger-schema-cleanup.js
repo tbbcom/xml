@@ -84,20 +84,20 @@ async function getAccessToken() {
   return token.access_token;
 }
 
-async function listPosts(accessToken, postIds) {
+async function* listPosts(accessToken, postIds) {
   if (postIds.length) {
-    return Promise.all(postIds.map((id) => request(`${API_ROOT}/blogs/${BLOG_ID}/posts/${id}`, { headers: { Authorization: `Bearer ${accessToken}` } })));
+    const posts = await Promise.all(postIds.map((id) => request(`${API_ROOT}/blogs/${BLOG_ID}/posts/${id}`, { headers: { Authorization: `Bearer ${accessToken}` } })));
+    yield* posts;
+    return;
   }
-  const posts = [];
   let pageToken = '';
   do {
     const params = new URLSearchParams({ fetchBodies: 'true', status: 'live', maxResults: '500' });
     if (pageToken) params.set('pageToken', pageToken);
     const page = await request(`${API_ROOT}/blogs/${BLOG_ID}/posts?${params}`, { headers: { Authorization: `Bearer ${accessToken}` } });
-    posts.push(...(page.items || []));
+    yield* page.items || [];
     pageToken = page.nextPageToken || '';
   } while (pageToken);
-  return posts;
 }
 
 async function updatePost(accessToken, post, content) {
