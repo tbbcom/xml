@@ -55,20 +55,7 @@ function decodeEntities(value) {
 function cleanJsonLd(html) {
   const changes = [];
   const re = /<script\b([^>]*)type\s*=\s*['"]application\/ld\+json['"]([^>]*)>([\s\S]*?)<\/script>/gi;
-  const cleanedHtml = String(html || '').replace(re, (full, before, after, raw) => {
-    let parsed;
-    try { parsed = JSON.parse(decodeEntities(raw).trim()); } catch { return full; }
-    const cleaned = removeArticleNodes(parsed);
-    if (cleaned === undefined) {
-      changes.push({ action: 'remove-block', removedTypes: getTypes(parsed) });
-      return '';
-    }
-    const beforeJson = JSON.stringify(parsed);
-    const afterJson = JSON.stringify(cleaned);
-    if (beforeJson === afterJson) return full;
-    changes.push({ action: 'rewrite-block', removedTypes: ['Article/BlogPosting/NewsArticle'] });
-    return `<script${before}type="application/ld+json"${after}>${JSON.stringify(cleaned, null, 2)}</script>`;
-  });
+67:    return `<script${before}type="application/ld+json"${after}>${JSON.stringify(cleaned, null, 2)}</script>`.replace(/<\/script/gi, '<\\/script');
   return { cleanedHtml, changes };
 }
 
