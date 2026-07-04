@@ -1,7 +1,8 @@
 # BLOGGER TECHNICAL SEO AUDIT
 
 ## Scope and evidence reviewed
-- Primary requested path: `github.com/tbbcom/xml/audit-input/gsc/`
+- Corrected user-provided path: `github.com/tbbcom/XML/assets/audit-input`
+- Repository path resolution result: no `assets/audit-input` directory exists; evidence is available under `asset/audit-input` in `origin/main`.
 - Repository-mapped artifact found: `/home/runner/work/xml/xml/asset/audit-input/gsc` (empty file, 0 bytes; no CSV/TXT/MD/JSON/image inside a `gsc/` directory)
 - Available GSC evidence files reviewed from `origin/main` snapshot (these files are not present on the current working branch):
   - `/home/runner/work/xml/xml/asset/audit-input/Chart.csv`
