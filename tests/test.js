@@ -4,7 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { lintXML } = require('../scripts/xml-lint.js');
+const { lintXML, parseXML } = require('../scripts/xml-lint.js');
 
 const FIXTURES = path.join(__dirname, 'fixtures');
 const PRODUCTION_TEMPLATE = path.join(__dirname, '..', 'asset', 'xml', 'ilmualam.xml');
