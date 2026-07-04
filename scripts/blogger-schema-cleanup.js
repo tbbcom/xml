@@ -117,10 +117,14 @@ async function main() {
   ensureApplySafety(args);
   if (!BLOG_ID) throw new Error('BLOGGER_BLOG_ID is required');
   const token = await getAccessToken();
-  const posts = await listPosts(token, args.postIds);
-  const candidates = posts.map((post) => ({ post, result: cleanJsonLd(post.content || '') }))
-    .filter(({ result }) => result.changes.length)
-    .slice(0, args.max);
+  const candidates = [];
+  for await (const post of listPosts(token, args.postIds)) {
+    const result = cleanJsonLd(post.content || '');
+    if (result.changes.length) {
+      candidates.push({ post, result });
+      if (candidates.length >= args.max) break;
+    }
+  }
 
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
