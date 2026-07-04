@@ -3,23 +3,23 @@
 ## Scope and evidence reviewed
 - Corrected user-provided path: `github.com/tbbcom/XML/assets/audit-input`
 - Repository path resolution result: no `assets/audit-input` directory exists; evidence is available under `asset/audit-input` in `origin/main`.
-- Repository-mapped artifact found: `/home/runner/work/xml/xml/asset/audit-input/gsc` (empty file, 0 bytes; no CSV/TXT/MD/JSON/image inside a `gsc/` directory)
+- Repository-mapped artifact found: `asset/audit-input/gsc` (empty file, 0 bytes; no CSV/TXT/MD/JSON/image inside a `gsc/` directory)
 - Available GSC evidence files reviewed from `origin/main` snapshot (these files are not present on the current working branch):
-  - `/home/runner/work/xml/xml/asset/audit-input/Chart.csv`
-  - `/home/runner/work/xml/xml/asset/audit-input/Critical issues.csv`
-  - `/home/runner/work/xml/xml/asset/audit-input/Non-critical issues.csv`
-  - `/home/runner/work/xml/xml/asset/audit-input/Metadata.csv`
+  - `asset/audit-input/Chart.csv`
+  - `asset/audit-input/Critical issues.csv`
+  - `asset/audit-input/Non-critical issues.csv`
+  - `asset/audit-input/Metadata.csv`
 - Evidence limitation: no URL-level export was provided for issue rows, so affected URL patterns are inferred and marked where confidence is low.
 
 ## Confirmed template-related behavior (not production XML changes yet)
 1. **Robots noindex logic is active for search/archive/error pages**
-   - XML trace: `/home/runner/work/xml/xml/asset/xml/ilmualam.xml:28-32`
+   - XML trace: `asset/xml/ilmualam.xml:28-32`
    - Effect: pages matching Blogger search/archive/error views are intentionally `noindex`.
 2. **Canonical tag is implemented site-wide for non-feed views**
-   - XML trace: `/home/runner/work/xml/xml/asset/xml/ilmualam.xml:1305-1310`
+   - XML trace: `asset/xml/ilmualam.xml:1305-1310`
    - Effect: canonical handling exists in template; duplicate clusters are unlikely due to missing canonical tag in standard rendered pages.
 3. **Pagination rel next/prev is present**
-   - XML trace: `/home/runner/work/xml/xml/asset/xml/ilmualam.xml:1332-1338`
+   - XML trace: `asset/xml/ilmualam.xml:1332-1338`
    - Effect: pagination signals exist; does not itself prove indexing defects.
 
 ## Issue-by-issue findings
