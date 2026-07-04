@@ -31,6 +31,7 @@ function getTypes(node) {
 
 function removeArticleNodes(value) {
   if (Array.isArray(value)) {
+    if (value.length === 0) return value;
     const kept = value.map(removeArticleNodes).filter((item) => item !== undefined);
     return kept.length ? kept : undefined;
   }
@@ -38,13 +39,8 @@ function removeArticleNodes(value) {
   if (getTypes(value).some((type) => ARTICLE_TYPES.has(type))) return undefined;
   const output = {};
   for (const [key, child] of Object.entries(value)) {
-    if (key === '@graph' && Array.isArray(child)) {
-      const graph = child.map(removeArticleNodes).filter((item) => item !== undefined);
-      if (graph.length) output[key] = graph;
-    } else {
-      const cleaned = removeArticleNodes(child);
-      if (cleaned !== undefined) output[key] = cleaned;
-    }
+    const cleaned = removeArticleNodes(child);
+    if (cleaned !== undefined) output[key] = cleaned;
   }
   return Object.keys(output).length ? output : undefined;
 }
