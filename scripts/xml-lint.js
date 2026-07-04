@@ -4,7 +4,7 @@
 'use strict';
 
 const fs = require('fs');
-const xmldom = require('xmldom');
+const xmldom = require('@xmldom/xmldom');
 const xpath = require('xpath');
 
 // Blogger namespace URI declared in the template root element.
@@ -28,15 +28,27 @@ function parseXML(xmlString) {
     const errors = [];
     const warnings = [];
 
+    // Strip UTF-8 BOM (U+FEFF) if present — @xmldom/xmldom 0.9.x rejects it.
+    const src = xmlString.charCodeAt(0) === 0xFEFF ? xmlString.slice(1) : xmlString;
+
     const parser = new xmldom.DOMParser({
-        errorHandler: {
-            warning: (msg) => warnings.push(msg),
-            error: (msg) => errors.push(msg),
-            fatalError: (msg) => errors.push(msg),
+        onError: (level, msg) => {
+            if (level === 'warning') {
+                warnings.push(msg);
+            } else {
+                // 'error' and 'fatalError' are both fatal for our purposes
+                errors.push(msg);
+            }
         },
     });
 
-    const doc = parser.parseFromString(xmlString);
+    let doc = null;
+    try {
+        doc = parser.parseFromString(src, 'text/xml');
+    } catch (e) {
+        // @xmldom/xmldom throws ParseError for fatal parse errors
+        errors.push(e.message || String(e));
+    }
     return { doc, errors, warnings };
 }
 

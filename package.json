@@ -20,7 +20,7 @@
   "author": "Ilmu Alam",
   "license": "MIT",
   "devDependencies": {
-    "xmldom": "^0.6.0",
+    "@xmldom/xmldom": "^0.9.10",
     "xpath": "^0.0.32"
   }
 }
