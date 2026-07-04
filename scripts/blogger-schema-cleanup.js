@@ -45,12 +45,19 @@ function removeArticleNodes(value) {
   return Object.keys(output).length ? output : undefined;
 }
 
+function decodeEntities(value) {
+  return String(value || '')
+    .replace(/&quot;/g, '"').replace(/&#34;/g, '"')
+    .replace(/&apos;/g, "'").replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+}
+
 function cleanJsonLd(html) {
   const changes = [];
   const re = /<script\b([^>]*)type\s*=\s*['"]application\/ld\+json['"]([^>]*)>([\s\S]*?)<\/script>/gi;
   const cleanedHtml = String(html || '').replace(re, (full, before, after, raw) => {
     let parsed;
-    try { parsed = JSON.parse(raw.trim()); } catch { return full; }
+    try { parsed = JSON.parse(decodeEntities(raw).trim()); } catch { return full; }
     const cleaned = removeArticleNodes(parsed);
     if (cleaned === undefined) {
       changes.push({ action: 'remove-block', removedTypes: getTypes(parsed) });
