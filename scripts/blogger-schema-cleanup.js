@@ -46,10 +46,13 @@ function removeArticleNodes(value) {
 }
 
 function decodeEntities(value) {
+function decodeEntities(value) {
   return String(value || '')
+    .replace(/&amp;/g, '&')
     .replace(/&quot;/g, '"').replace(/&#34;/g, '"')
     .replace(/&apos;/g, "'").replace(/&#39;/g, "'")
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+}
 }
 
 function cleanJsonLd(html) {
