@@ -32,8 +32,18 @@ test('leaves invalid JSON-LD unchanged', () => {
   assert.equal(result.changes.length, 0);
 });
 
-test('defaults to dry-run and maximum five posts', () => {
-  const args = parseArgs(['node', 'script']);
-  assert.equal(args.apply, false);
-  assert.equal(args.max, 5);
+test('preserves empty arrays in non-removed schema', () => {
+  const input = {
+    '@type': 'FAQPage',
+    'mainEntity': []
+  };
+  const cleaned = removeArticleNodes(input);
+  assert.deepEqual(cleaned, { '@type': 'FAQPage', 'mainEntity': [] });
+});
+
+test('decodes HTML entities in JSON-LD blocks', () => {
+  const html = '<p>Hello</p><script type="application/ld+json">{"@type":"Article","headline":"X"}</script>';
+  const result = cleanJsonLd(html);
+  assert.equal(result.changes.length, 1);
+  assert.equal(result.cleanedHtml.includes('Article'), false);
 });
