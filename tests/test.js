@@ -103,10 +103,16 @@ test('production template keeps one robots branch pair and no unconditional noin
 });
 
 test('production canonical and hreflang consistently use canonical URL object', () => {
-    const xml = loadProductionTemplate();
-    assert.match(xml, /hreflang=['"]ms-MY['"][^>]*rel=['"]alternate['"]|rel=['"]alternate['"][^>]*hreflang=['"]ms-MY['"]/, 'Missing ms-MY hreflang');
-    assert.match(xml, /hreflang=['"]x-default['"][^>]*rel=['"]alternate['"]|rel=['"]alternate['"][^>]*hreflang=['"]x-default['"]/, 'Missing x-default hreflang');
-    assert.equal(countMatches(xml, /expr:href=['"]data:view\.url\.canonical['"]/g) >= 3, true, 'Canonical and both hreflang tags must use data:view.url.canonical');
+    const { doc } = parseXML(loadProductionTemplate());
+    const links = Array.from(doc.getElementsByTagName('link'));
+
+    const msMyLink = links.find(link => link.getAttribute('hreflang') === 'ms-MY' && link.getAttribute('rel') === 'alternate');
+    assert.ok(msMyLink, 'Missing ms-MY hreflang alternate link');
+    assert.equal(msMyLink.getAttribute('expr:href'), 'data:view.url.canonical', 'ms-MY hreflang must use data:view.url.canonical');
+
+    const xDefaultLink = links.find(link => link.getAttribute('hreflang') === 'x-default' && link.getAttribute('rel') === 'alternate');
+    assert.ok(xDefaultLink, 'Missing x-default hreflang alternate link');
+    assert.equal(xDefaultLink.getAttribute('expr:href'), 'data:view.url.canonical', 'x-default hreflang must use data:view.url.canonical');
 });
 
 test('production template does not contain insecure HTTP asset URLs', () => {
