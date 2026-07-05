@@ -13,7 +13,7 @@ const REFRESH_TOKEN = process.env.BLOGGER_REFRESH_TOKEN || '';
 const OUT_DIR = path.resolve(process.env.CLEANUP_OUTPUT_DIR || 'reports/blogger-schema-cleanup');
 
 function parseArgs(argv) {
-  const args = { apply: false, max: 5, confirmBlogId: '', postIds: [] };
+  const args = { apply: false, max: 10, confirmBlogId: '', postIds: [] };
   for (const arg of argv.slice(2)) {
     if (arg === '--apply') args.apply = true;
     else if (arg.startsWith('--max=')) args.max = Number(arg.slice(6));
