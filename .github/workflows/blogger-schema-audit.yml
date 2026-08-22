@@ -1,4 +1,4 @@
-name: Blogger Schema & SERP Audit
+name: TBB Blogger Schema & SERP Audit
 
 on:
   workflow_dispatch:
@@ -31,18 +31,28 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Run read-only Blogger audit
+      - name: Validate TBB audit target
         env:
-          BLOGGER_API_KEY: ${{ secrets.BLOGGER_API_KEY }}
-          BLOGGER_BLOG_ID: ${{ secrets.BLOGGER_BLOG_ID }}
-          BLOGGER_BLOG_URL: ${{ secrets.BLOGGER_BLOG_URL }}
+          TBB_BLOG_URL: ${{ secrets.TBB_BLOGGER_BLOG_URL }}
+        run: |
+          set -euo pipefail
+          if [ "${TBB_BLOG_URL}" != "https://www.thebukitbesi.com/" ] && [ "${TBB_BLOG_URL}" != "https://thebukitbesi.com/" ]; then
+            echo "Refusing to run: TBB_BLOGGER_BLOG_URL is missing or not thebukitbesi.com"
+            exit 1
+          fi
+
+      - name: Run read-only TBB Blogger audit
+        env:
+          BLOGGER_API_KEY: ${{ secrets.TBB_BLOGGER_API_KEY }}
+          BLOGGER_BLOG_ID: ${{ secrets.TBB_BLOGGER_BLOG_ID }}
+          BLOGGER_BLOG_URL: ${{ secrets.TBB_BLOGGER_BLOG_URL }}
           BLOGGER_MAX_RESULTS: ${{ inputs.max_results }}
         run: npm run audit:blogger
 
       - name: Upload audit report
         uses: actions/upload-artifact@v4
         with:
-          name: blogger-schema-serp-audit
+          name: tbb-blogger-schema-serp-audit
           path: reports/blogger-schema-audit/
           if-no-files-found: error
           retention-days: 30
