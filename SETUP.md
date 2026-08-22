@@ -1,25 +1,31 @@
-# Blogger XML Template - Setup & Validation Guide
+# The Bukit Besi Blogger Template — Setup & Validation
 
-## Overview
+This repository contains the Blogger XML template for **thebukitbesi.com**.
 
-This repository contains the Blogger XML template for [ilmualam.com](https://www.ilmualam.com) with built-in validation tools to catch errors before deployment.
+## Requirements
 
-## Quick Start
-
-### Prerequisites
-- Node.js 14+ ([download](https://nodejs.org/))
+- Node.js 18+
 - Git
-- GitHub account with access to this repository
+- GitHub access to `tbbcom/xml`
 
-### Installation
+## Local validation
 
 ```bash
-# Clone the repository
-git clone https://github.com/ilmualam/xml.git
+git clone https://github.com/tbbcom/xml.git
 cd xml
-
-# Install dependencies
-npm install
-
-# Run validation
+npm ci
 npm test
+npm run validate
+```
+
+Production source:
+
+```text
+asset/xml/thebukitbesi.xml
+```
+
+## Deployment rule
+
+The repository does not auto-deploy to Blogger. Validate on a feature branch, back up the current Blogger theme, import the XML into a Blogger test/preview context first, then publish manually only after render, schema, responsive and Core Web Vitals checks pass.
+
+Any Blogger API workflow must use TBB-specific `TBB_BLOGGER_*` secrets and verify the target hostname before reading or changing content.
