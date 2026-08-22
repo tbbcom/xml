@@ -1,21 +1,21 @@
 # Security Policy
 
-## Supported Versions
+## Scope
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+This repository contains the Blogger template and maintenance tooling for **thebukitbesi.com**.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+## Reporting
 
-## Reporting a Vulnerability
+Report suspected vulnerabilities privately to the repository maintainers. Do not publish credentials, Blogger IDs, OAuth tokens, API keys, cookies, private URLs, or exploit details in public issues or pull requests.
 
-Use this section to tell people how to report a vulnerability.
+## Credential rules
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+- Never commit secrets.
+- Blogger workflows must use the `TBB_BLOGGER_*` secret namespace.
+- Write-capable scripts must verify the TBB hostname and expected blog ID before mutation.
+- Do not reuse credentials from another website.
+- Production deployment remains manual; repository changes do not auto-deploy to Blogger.
+
+## Supported source
+
+Only the current `main` branch and active release/maintenance branches are supported after they pass review and validation.
