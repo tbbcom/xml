@@ -120,3 +120,32 @@ test('production template does not contain insecure HTTP asset URLs', () => {
     const insecureAssets = [...xml.matchAll(/(?:src|href)\s*=\s*['"]http:\/\/[^'"]+['"]/g)].map((m) => m[0]);
     assert.deepEqual(insecureAssets, [], `Found insecure asset URLs: ${insecureAssets.join(', ')}`);
 });
+
+test('production template contains no Ilmu Alam cross-site dependency', () => {
+    const xml = loadProductionTemplate();
+    const forbidden = [
+        /ilmualam/i,
+        /theilmualam/i,
+        /ilmualam\.github\.io/i,
+        /ilmualam\.pages\.dev/i,
+        /api\.alquran\.cloud/i,
+        /cdn\.islamic\.network/i,
+        /mp3quran/i
+    ];
+    for (const pattern of forbidden) {
+        assert.doesNotMatch(xml, pattern, `Forbidden inherited dependency found: ${pattern}`);
+    }
+});
+
+test('production template has no jQuery or inherited third-party ad runtime', () => {
+    const xml = loadProductionTemplate();
+    assert.doesNotMatch(xml, /jquery/i, 'TBB clean template must not depend on jQuery');
+    assert.doesNotMatch(xml, /live\.demand\.supply|demand\s*supply/i, 'TBB clean template must not load inherited Demand Supply runtime');
+});
+
+test('production template has one page H1 strategy', () => {
+    const xml = loadProductionTemplate();
+    assert.match(xml, /<h1>Panduan, Direktori &amp; Maklumat Malaysia<\/h1>/, 'Homepage should have the editorial hero H1');
+    assert.match(xml, /<h1><data:post\.title\/><\/h1>/, 'Single posts should use the post title as H1');
+    assert.doesNotMatch(xml, /class=['"]tbb-brand['"][^>]*>\s*<h1/i, 'Header brand must not create another H1');
+});
