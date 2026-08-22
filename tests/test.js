@@ -7,7 +7,7 @@ const path = require('path');
 const { lintXML, parseXML } = require('../scripts/xml-lint.js');
 
 const FIXTURES = path.join(__dirname, 'fixtures');
-const PRODUCTION_TEMPLATE = path.join(__dirname, '..', 'asset', 'xml', 'ilmualam.xml');
+const PRODUCTION_TEMPLATE = path.join(__dirname, '..', 'asset', 'xml', 'thebukitbesi.xml');
 
 function loadFixture(name) {
     return fs.readFileSync(path.join(FIXTURES, name), 'utf8');
