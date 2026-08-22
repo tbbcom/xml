@@ -3,15 +3,24 @@
 const fs = require('fs');
 const path = require('path');
 
-const URLS = (process.env.AUDIT_URLS || 'https://www.ilmualam.com/2026/03/surah-al-kautsar.html')
+const URLS = (process.env.AUDIT_URLS || 'https://www.thebukitbesi.com/')
   .split(',').map((value) => value.trim()).filter(Boolean);
 const OUT_DIR = path.resolve(process.env.LIVE_AUDIT_OUTPUT_DIR || 'reports/live-jsonld-audit');
+const ALLOWED_HOSTS = new Set(['thebukitbesi.com', 'www.thebukitbesi.com']);
 
 function decodeEntities(value) {
   return String(value || '')
     .replace(/&quot;/g, '"').replace(/&#34;/g, '"')
     .replace(/&apos;/g, "'").replace(/&#39;/g, "'")
     .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+}
+
+function assertAllowedUrl(value) {
+  const url = new URL(value);
+  if (url.protocol !== 'https:' || !ALLOWED_HOSTS.has(url.hostname)) {
+    throw new Error(`Refusing non-TBB URL: ${value}`);
+  }
+  return url;
 }
 
 function inspectHtml(html) {
@@ -46,21 +55,28 @@ function inspectHtml(html) {
 async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const results = [];
-  for (const url of URLS) {
+  for (const value of URLS) {
+    const urlObject = assertAllowedUrl(value);
+    const url = urlObject.href;
     const response = await fetch(url, {
       redirect: 'follow',
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; IlmuAlamSchemaAudit/1.0)' }
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; TheBukitBesiSchemaAudit/1.0)' }
     });
+    const finalUrl = new URL(response.url);
+    if (!ALLOWED_HOSTS.has(finalUrl.hostname)) {
+      throw new Error(`Refusing redirect outside TBB: ${response.url}`);
+    }
     const html = await response.text();
     const report = {
       url,
+      finalUrl: response.url,
       status: response.status,
       contentType: response.headers.get('content-type') || '',
       fetchedAt: new Date().toISOString(),
       ...inspectHtml(html)
     };
     results.push(report);
-    const slug = new URL(url).pathname.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'home';
+    const slug = urlObject.pathname.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'home';
     fs.writeFileSync(path.join(OUT_DIR, `${slug}.html`), html);
   }
   fs.writeFileSync(path.join(OUT_DIR, 'report.json'), JSON.stringify({ results }, null, 2));
@@ -76,4 +92,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { inspectHtml, decodeEntities };
+module.exports = { inspectHtml, decodeEntities, assertAllowedUrl };
