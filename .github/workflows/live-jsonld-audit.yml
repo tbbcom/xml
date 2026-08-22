@@ -1,12 +1,12 @@
-name: Live JSON-LD Audit
+name: TBB Live JSON-LD Audit
 
 on:
   workflow_dispatch:
     inputs:
       urls:
-        description: Comma-separated live URLs to audit
+        description: Comma-separated live TBB URLs to audit
         required: true
-        default: https://www.ilmualam.com/2026/03/surah-al-kautsar.html
+        default: https://www.thebukitbesi.com/
 
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - name: Upload live audit artifact
         uses: actions/upload-artifact@v4
         with:
-          name: live-jsonld-audit
+          name: tbb-live-jsonld-audit
           path: reports/live-jsonld-audit/
           if-no-files-found: error
           retention-days: 30
