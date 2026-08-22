@@ -1,0 +1,101 @@
+name: Temporary TBB PR41 scrub
+
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  scrub:
+    if: github.event.number == 41 && github.event.pull_request.head.ref == 'chore/tbb-hard-separation' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout isolated TBB branch
+        uses: actions/checkout@v4
+        with:
+          ref: chore/tbb-hard-separation
+          fetch-depth: 0
+
+      - name: Purge inherited Ilmu Alam runtime identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('asset/xml/thebukitbesi.xml')
+          text = p.read_text(encoding='utf-8-sig')
+
+          # Remove inherited cross-site PWA/service-worker calls rather than redirecting them.
+          text = re.sub(r"<link[^>]+ilmualam\.github\.io/pwa/manifest\.json[^>]*/?>\s*", '', text, flags=re.I)
+          text = re.sub(r"navigator\.serviceWorker\.register\([\"']https://ilmualam\.pages\.dev/sw\.js[\"']\s*,\s*\{scope:[\"']/[\"']\}\)\s*;?", '', text, flags=re.I)
+
+          # Remove inherited Quran-only network hints from the global TBB shell.
+          for host in ('server8.mp3quran.net','cdn.islamic.network','api.alquran.cloud','apis.quran.foundation'):
+              text = re.sub(rf"<link[^>]+{re.escape(host)}[^>]*/?>\s*", '', text, flags=re.I)
+
+          # TBB global typography does not need inherited Arabic fonts.
+          text = text.replace(
+              'family=Inter:wght@400;500;600;700&amp;family=Noto+Naskh+Arabic:wght@400;500;600;700&amp;family=Amiri:wght@400;700&amp;display=swap',
+              'family=Inter:wght@400;500;600;700&amp;display=swap'
+          )
+
+          # Hard site-identity separation. This intentionally changes only the TBB branch.
+          replacements = [
+              ('https://www.ilmualam.com','https://www.thebukitbesi.com'),
+              ('https://ilmualam.com','https://thebukitbesi.com'),
+              ('www.ilmualam.com','www.thebukitbesi.com'),
+              ('ilmualam.com','thebukitbesi.com'),
+              ('ilmualamcom','thebukitbesi'),
+              ('Ilmu Alam','The Bukit Besi'),
+              ('ILMU ALAM','THE BUKIT BESI'),
+              ('IlmuAlam','TheBukitBesi'),
+              ('theilmualam','thebukitbesi'),
+              ('@ilmualam','@thebukitbesi'),
+              ("title='Perkongsian Ilmu Allah dan Sunnah'","title='The Bukit Besi'"),
+              ('Motivasi Islamik','Portal Rujukan Malaysia'),
+              ('Laman Perkongsian Ilmu & Sunnah','The Bukit Besi'),
+              ('The The Bukit Besi Green','The Bukit Besi'),
+              ('The Bukit Besi Green','The Bukit Besi')
+          ]
+          for old,new in replacements:
+              text = text.replace(old,new)
+
+          # Catch any case-variant inherited identifier left in attributes/IDs.
+          text = re.sub(r'ilmualam', 'thebukitbesi', text, flags=re.I)
+
+          if re.search(r'ilmualam', text, flags=re.I):
+              raise SystemExit('Ilmu Alam identifier still present after scrub')
+
+          p.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Validate production XML and regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s asset/xml/thebukitbesi.xml
+          test ! -e asset/xml/ilmualam.xml
+          ! grep -RniE 'ilmualam|asset/xml/ilmualam\.xml' asset/xml/thebukitbesi.xml scripts tests .github/workflows/blogger-*.yml .github/workflows/live-jsonld-audit.yml
+          npm ci
+          npm test
+          npm run validate
+
+      - name: Commit scrubbed branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- asset/xml/thebukitbesi.xml scripts tests
+          if git diff --cached --quiet; then
+            echo 'No scrub changes required.'
+            exit 0
+          fi
+          git commit -m 'chore: purge Ilmu Alam runtime identity from TBB XML'
+          git push origin HEAD:chore/tbb-hard-separation
