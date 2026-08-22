@@ -1,4 +1,4 @@
-name: One-time TBB XML separation
+name: One-time TBB source scrub
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 jobs:
-  migrate:
+  scrub:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -21,7 +21,7 @@ jobs:
         with:
           ref: chore/tbb-hard-separation
 
-      - name: Separate TBB XML and purge Ilmu Alam runtime references
+      - name: Purge inherited cross-site references
         shell: bash
         run: |
           set -euo pipefail
@@ -30,15 +30,10 @@ jobs:
           import re
 
           root = Path('.')
-          old_xml = root / 'asset/xml/ilmualam.xml'
-          new_xml = root / 'asset/xml/thebukitbesi.xml'
+          production_xml = root / 'asset/xml/thebukitbesi.xml'
+          if not production_xml.exists():
+              raise SystemExit('asset/xml/thebukitbesi.xml not found')
 
-          if old_xml.exists() and not new_xml.exists():
-              old_xml.rename(new_xml)
-          elif not new_xml.exists():
-              raise SystemExit('Production XML not found')
-
-          # First pass: exact identity/path replacements across repo text files.
           allowed = {'.xml', '.js', '.json', '.md', '.yml', '.yaml', '.html', '.css', '.txt'}
           replacements = [
               ('asset/xml/ilmualam.xml', 'asset/xml/thebukitbesi.xml'),
@@ -67,8 +62,7 @@ jobs:
               if text != original:
                   path.write_text(text, encoding='utf-8')
 
-          # Production XML runtime cleanup. Keep this targeted to avoid changing content semantics.
-          text = new_xml.read_text(encoding='utf-8-sig')
+          text = production_xml.read_text(encoding='utf-8-sig')
           lines = text.splitlines()
           blocked_fragments = (
               'ilmualam.github.io/pwa/manifest.json',
@@ -80,60 +74,49 @@ jobs:
           lines = [line for line in lines if not any(fragment in line for fragment in blocked_fragments)]
           text = '\n'.join(lines) + '\n'
 
-          # Remove unverifiable inherited social handles instead of inventing new ones.
           text = re.sub(r"^.*(?:twitter:site|twitter:creator).*theilmualam.*\n?", '', text, flags=re.I | re.M)
-
-          # TBB does not need Arabic font families globally. Preserve Inter only.
           text = re.sub(
               r"family=Inter:wght@400;500;600;700&amp;family=Noto\+Naskh\+Arabic:wght@400;500;600;700&amp;family=Amiri:wght@400;700&amp;display=swap",
               "family=Inter:wght@400;500;600;700&amp;display=swap",
               text,
           )
-
-          # Remove inherited Islamic logo/widget title and app identity.
           text = text.replace("title='Perkongsian Ilmu Allah dan Sunnah'", "title='The Bukit Besi'")
-          text = text.replace("content='The Bukit Besi' name='apple-mobile-web-app-title'", "content='The Bukit Besi' name='apple-mobile-web-app-title'")
-          text = text.replace('Name:         The The Bukit Besi Green', 'Name:         The Bukit Besi')
           text = text.replace('Name:         The Bukit Besi Green', 'Name:         The Bukit Besi')
 
-          # Hard fail if live/runtime Ilmu Alam identifiers remain in production XML.
-          forbidden = [
-              'ilmualam.com',
-              'ilmualam.github.io',
-              'Ilmu Alam',
-              'ILMU ALAM',
-              'IlmuAlam',
-              'theilmualam',
-          ]
+          forbidden = ('ilmualam.com', 'ilmualam.github.io', 'Ilmu Alam', 'IlmuAlam', 'theilmualam')
           remaining = [item for item in forbidden if item.lower() in text.lower()]
           if remaining:
-              raise SystemExit(f'Forbidden Ilmu Alam identifiers remain in production XML: {remaining}')
+              raise SystemExit(f'Forbidden cross-site identifiers remain in production XML: {remaining}')
+          production_xml.write_text(text, encoding='utf-8')
 
-          new_xml.write_text(text, encoding='utf-8')
+          # The migration workflow is deliberately one-shot.
+          workflow = root / '.github/workflows/tbb-one-time-separation.yml'
+          if workflow.exists():
+              workflow.unlink()
           PY
 
-      - name: Verify separation
+      - name: Verify isolated TBB source
         shell: bash
         run: |
           set -euo pipefail
           test -s asset/xml/thebukitbesi.xml
           test ! -e asset/xml/ilmualam.xml
-          ! grep -RniE 'ilmualam\.com|ilmualam\.github\.io|Ilmu Alam|IlmuAlam|theilmualam' \
+          ! grep -RniE 'ilmualam\.com|ilmualam\.github\.io|Ilmu Alam|IlmuAlam|theilmualam|asset/xml/ilmualam\.xml' \
             asset/xml/thebukitbesi.xml scripts tests .github/workflows package.json package-lock.json
           npm ci
           npm test
           npm run validate
 
-      - name: Commit separated TBB source
+      - name: Commit scrubbed TBB source
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- asset/xml/thebukitbesi.xml asset/xml/ilmualam.xml scripts tests .github/workflows package.json package-lock.json SETUP.md CLAUDE.md README.md docs asset/index.html sitemap.js BLOGGER_TECHNICAL_SEO_AUDIT.md LIVE_SITE_VERIFICATION.md || true
+          git add -- asset/xml/thebukitbesi.xml scripts tests .github/workflows package.json package-lock.json SETUP.md CLAUDE.md README.md docs asset/index.html sitemap.js BLOGGER_TECHNICAL_SEO_AUDIT.md LIVE_SITE_VERIFICATION.md || true
           if git diff --cached --quiet; then
-            echo 'No migration changes to commit.'
+            echo 'No scrub changes to commit.'
             exit 0
           fi
-          git commit -m 'chore: hard-separate TBB from Ilmu Alam source'
+          git commit -m 'chore: purge Ilmu Alam runtime references from TBB'
           git push origin HEAD:chore/tbb-hard-separation
