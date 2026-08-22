@@ -1,7 +1,7 @@
 {
-  "name": "ilmualam-blogger-xml",
+  "name": "thebukitbesi-blogger-xml",
   "version": "1.0.0",
-  "description": "Blogger XML Template for ilmualam.com with validation tools",
+  "description": "Blogger XML template and validation tools for thebukitbesi.com",
   "engines": {
     "node": ">=18.0.0"
   },
@@ -18,9 +18,10 @@
     "blogger",
     "xml",
     "template",
-    "validation"
+    "validation",
+    "thebukitbesi"
   ],
-  "author": "Ilmu Alam",
+  "author": "The Bukit Besi",
   "license": "MIT",
   "devDependencies": {
     "@xmldom/xmldom": "^0.9.10",

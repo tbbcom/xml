@@ -4,11 +4,20 @@ const fs = require('fs');
 const path = require('path');
 
 const API_ROOT = 'https://www.googleapis.com/blogger/v3';
-const BLOG_URL = process.env.BLOGGER_BLOG_URL || 'https://www.ilmualam.com/';
+const BLOG_URL = process.env.BLOGGER_BLOG_URL || 'https://www.thebukitbesi.com/';
 const API_KEY = process.env.BLOGGER_API_KEY || '';
 const BLOG_ID = process.env.BLOGGER_BLOG_ID || '';
 const OUT_DIR = path.resolve(process.env.AUDIT_OUTPUT_DIR || 'reports/blogger-schema-audit');
 const MAX_RESULTS = Number(process.env.BLOGGER_MAX_RESULTS || 500);
+const ALLOWED_HOSTS = new Set(['thebukitbesi.com', 'www.thebukitbesi.com']);
+
+function assertTbbBlogUrl(value) {
+  const url = new URL(value);
+  if (url.protocol !== 'https:' || !ALLOWED_HOSTS.has(url.hostname)) {
+    throw new Error(`Refusing non-TBB Blogger target: ${value}`);
+  }
+  return url.href;
+}
 
 function decodeEntities(value) {
   return String(value || '')
@@ -108,9 +117,10 @@ async function apiGet(url) {
 }
 
 async function resolveBlogId() {
+  const safeBlogUrl = assertTbbBlogUrl(BLOG_URL);
   if (BLOG_ID) return BLOG_ID;
   if (!API_KEY) throw new Error('Set BLOGGER_BLOG_ID or BLOGGER_API_KEY. The audit is read-only.');
-  const url = `${API_ROOT}/blogs/byurl?url=${encodeURIComponent(BLOG_URL)}&key=${encodeURIComponent(API_KEY)}`;
+  const url = `${API_ROOT}/blogs/byurl?url=${encodeURIComponent(safeBlogUrl)}&key=${encodeURIComponent(API_KEY)}`;
   const blog = await apiGet(url);
   return blog.id;
 }
@@ -143,7 +153,7 @@ function writeReports(rows, blogId) {
 
   const issueCounts = rows.flatMap((r) => r.issues).reduce((acc, issue) => ((acc[issue] = (acc[issue] || 0) + 1), acc), {});
   const summary = [
-    '# Blogger Schema & SERP Audit', '',
+    '# The Bukit Besi Blogger Schema & SERP Audit', '',
     `Generated: ${new Date().toISOString()}`,
     `Blog: ${BLOG_URL}`,
     `Posts audited: ${rows.length}`, '',
@@ -157,6 +167,7 @@ function writeReports(rows, blogId) {
 }
 
 async function main() {
+  assertTbbBlogUrl(BLOG_URL);
   const blogId = await resolveBlogId();
   const posts = await fetchPosts(blogId);
   const rows = posts.map(auditPost).sort((a, b) => b.issues.length - a.issues.length);
@@ -168,4 +179,4 @@ if (require.main === module) {
   main().catch((error) => { console.error(error.message); process.exitCode = 1; });
 }
 
-module.exports = { extractJsonLd, collectTypes, auditPost, stripHtml };
+module.exports = { extractJsonLd, collectTypes, auditPost, stripHtml, assertTbbBlogUrl };

@@ -1,4 +1,4 @@
-name: Blogger Content Refresh
+name: TBB Blogger Content Refresh
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ on:
           - dry-run
           - apply
       manifest:
-        description: "Manifest path"
+        description: "TBB manifest path"
         required: true
         default: "content-refresh/manifest.json"
         type: string
@@ -22,7 +22,7 @@ on:
         default: "1"
         type: string
       confirm_blog_id:
-        description: "Required only for apply; must exactly match BLOGGER_BLOG_ID"
+        description: "Required only for apply; must exactly match TBB_BLOGGER_BLOG_ID"
         required: false
         default: ""
         type: string
@@ -41,19 +41,27 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Validate mode
+      - name: Validate TBB target and mode
+        env:
+          TBB_BLOG_URL: ${{ secrets.TBB_BLOGGER_BLOG_URL }}
         run: |
+          set -euo pipefail
+          if [ "${TBB_BLOG_URL}" != "https://www.thebukitbesi.com/" ] && [ "${TBB_BLOG_URL}" != "https://thebukitbesi.com/" ]; then
+            echo "Refusing to run: TBB_BLOGGER_BLOG_URL is missing or not thebukitbesi.com"
+            exit 1
+          fi
           if [ "${{ inputs.mode }}" != "dry-run" ] && [ "${{ inputs.mode }}" != "apply" ]; then
             echo "Unsupported mode"
             exit 1
           fi
 
-      - name: Generate refresh preview or apply approved update
+      - name: Generate refresh preview or apply approved TBB update
         env:
-          BLOGGER_BLOG_ID: ${{ secrets.BLOGGER_BLOG_ID }}
-          BLOGGER_CLIENT_ID: ${{ secrets.BLOGGER_CLIENT_ID }}
-          BLOGGER_CLIENT_SECRET: ${{ secrets.BLOGGER_CLIENT_SECRET }}
-          BLOGGER_REFRESH_TOKEN: ${{ secrets.BLOGGER_REFRESH_TOKEN }}
+          BLOGGER_BLOG_ID: ${{ secrets.TBB_BLOGGER_BLOG_ID }}
+          BLOGGER_BLOG_URL: ${{ secrets.TBB_BLOGGER_BLOG_URL }}
+          BLOGGER_CLIENT_ID: ${{ secrets.TBB_BLOGGER_CLIENT_ID }}
+          BLOGGER_CLIENT_SECRET: ${{ secrets.TBB_BLOGGER_CLIENT_SECRET }}
+          BLOGGER_REFRESH_TOKEN: ${{ secrets.TBB_BLOGGER_REFRESH_TOKEN }}
         run: |
           ARGS="--manifest=${{ inputs.manifest }} --max=${{ inputs.max_posts }}"
           if [ "${{ inputs.mode }}" = "apply" ]; then
@@ -64,7 +72,7 @@ jobs:
       - name: Upload backup and preview
         uses: actions/upload-artifact@v4
         with:
-          name: blogger-content-refresh-${{ inputs.mode }}
+          name: tbb-blogger-content-refresh-${{ inputs.mode }}
           path: reports/blogger-content-refresh/
           if-no-files-found: error
           retention-days: 30

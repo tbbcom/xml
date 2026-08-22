@@ -6,10 +6,25 @@ const path = require('path');
 const API_ROOT = 'https://www.googleapis.com/blogger/v3';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const BLOG_ID = process.env.BLOGGER_BLOG_ID || '';
+const BLOG_URL = process.env.BLOGGER_BLOG_URL || '';
 const CLIENT_ID = process.env.BLOGGER_CLIENT_ID || '';
 const CLIENT_SECRET = process.env.BLOGGER_CLIENT_SECRET || '';
 const REFRESH_TOKEN = process.env.BLOGGER_REFRESH_TOKEN || '';
 const OUT_DIR = path.resolve(process.env.REFRESH_OUTPUT_DIR || 'reports/blogger-content-refresh');
+const ALLOWED_HOSTS = new Set(['thebukitbesi.com', 'www.thebukitbesi.com']);
+
+function assertTbbUrl(value, label = 'URL') {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`${label} is invalid: ${value}`);
+  }
+  if (url.protocol !== 'https:' || !ALLOWED_HOSTS.has(url.hostname)) {
+    throw new Error(`${label} must target thebukitbesi.com, received: ${value}`);
+  }
+  return url;
+}
 
 function parseArgs(argv) {
   const args = { apply: false, manifest: 'content-refresh/manifest.json', confirmBlogId: '', max: 1 };
@@ -80,6 +95,8 @@ function validateHtml(html) {
 
 function ensureApplySafety(args) {
   if (!BLOG_ID) throw new Error('BLOGGER_BLOG_ID is required');
+  if (!BLOG_URL) throw new Error('BLOGGER_BLOG_URL is required');
+  assertTbbUrl(BLOG_URL, 'BLOGGER_BLOG_URL');
   if (!args.apply) return;
   if (args.confirmBlogId !== BLOG_ID) {
     throw new Error('Apply blocked: --confirm-blog-id must exactly match BLOGGER_BLOG_ID');
@@ -88,10 +105,13 @@ function ensureApplySafety(args) {
 }
 
 async function findPost(accessToken, item) {
+  assertTbbUrl(item.url, 'Manifest post URL');
   if (item.postId) {
-    return request(`${API_ROOT}/blogs/${BLOG_ID}/posts/${item.postId}?fetchBody=true`, {
+    const post = await request(`${API_ROOT}/blogs/${BLOG_ID}/posts/${item.postId}?fetchBody=true`, {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
+    assertTbbUrl(post.url, 'Resolved Blogger post URL');
+    return post;
   }
   const expected = normalizeUrl(item.url);
   let pageToken = '';
@@ -102,7 +122,10 @@ async function findPost(accessToken, item) {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
     const found = (page.items || []).find((post) => normalizeUrl(post.url) === expected);
-    if (found) return found;
+    if (found) {
+      assertTbbUrl(found.url, 'Resolved Blogger post URL');
+      return found;
+    }
     pageToken = page.nextPageToken || '';
   } while (pageToken);
   throw new Error(`Post not found for URL: ${item.url}`);
@@ -126,6 +149,7 @@ async function main() {
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   const items = Array.isArray(manifest.posts) ? manifest.posts.slice(0, args.max) : [];
   if (!items.length) throw new Error('Manifest has no posts');
+  for (const item of items) assertTbbUrl(item.url, 'Manifest post URL');
 
   const token = await getAccessToken();
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -167,6 +191,7 @@ async function main() {
 
     if (args.apply) {
       const updated = await patchPost(token, post.id, payload);
+      assertTbbUrl(updated.url, 'Updated Blogger post URL');
       result.applied = true;
       result.updatedTitle = updated.title;
       result.updatedUrl = updated.url;
@@ -177,10 +202,11 @@ async function main() {
   fs.writeFileSync(path.join(runDir, 'manifest.json'), JSON.stringify({
     mode: args.apply ? 'apply' : 'dry-run',
     blogId: BLOG_ID,
+    blogUrl: BLOG_URL,
     generatedAt: new Date().toISOString(),
     posts: results
   }, null, 2));
-  console.log(`${args.apply ? 'Applied' : 'Dry-run generated for'} ${results.length} post(s). Output: ${runDir}`);
+  console.log(`${args.apply ? 'Applied' : 'Dry-run generated for'} ${results.length} TBB post(s). Output: ${runDir}`);
 }
 
 if (require.main === module) {
@@ -190,4 +216,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseArgs, normalizeUrl, validateHtml, ensureApplySafety };
+module.exports = { parseArgs, normalizeUrl, validateHtml, ensureApplySafety, assertTbbUrl };

@@ -7,10 +7,25 @@ const API_ROOT = 'https://www.googleapis.com/blogger/v3';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const ARTICLE_TYPES = new Set(['Article', 'BlogPosting', 'NewsArticle']);
 const BLOG_ID = process.env.BLOGGER_BLOG_ID || '';
+const BLOG_URL = process.env.BLOGGER_BLOG_URL || '';
 const CLIENT_ID = process.env.BLOGGER_CLIENT_ID || '';
 const CLIENT_SECRET = process.env.BLOGGER_CLIENT_SECRET || '';
 const REFRESH_TOKEN = process.env.BLOGGER_REFRESH_TOKEN || '';
 const OUT_DIR = path.resolve(process.env.CLEANUP_OUTPUT_DIR || 'reports/blogger-schema-cleanup');
+const ALLOWED_HOSTS = new Set(['thebukitbesi.com', 'www.thebukitbesi.com']);
+
+function assertTbbUrl(value, label = 'URL') {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`${label} is invalid: ${value}`);
+  }
+  if (url.protocol !== 'https:' || !ALLOWED_HOSTS.has(url.hostname)) {
+    throw new Error(`${label} must target thebukitbesi.com, received: ${value}`);
+  }
+  return url;
+}
 
 function parseArgs(argv) {
   const args = { apply: false, max: 5, confirmBlogId: '', postIds: [] };
@@ -125,13 +140,19 @@ async function getAccessToken() {
   return token.access_token;
 }
 
+function assertPostTargetsTbb(post) {
+  if (!post || !post.url) throw new Error('Blogger post is missing URL');
+  assertTbbUrl(post.url, 'Blogger post URL');
+  return post;
+}
+
 async function* listPosts(accessToken, postIds) {
   if (postIds.length) {
     const posts = await Promise.all(postIds.map((id) => request(
       `${API_ROOT}/blogs/${BLOG_ID}/posts/${id}`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     )));
-    yield* posts;
+    for (const post of posts) yield assertPostTargetsTbb(post);
     return;
   }
 
@@ -142,13 +163,14 @@ async function* listPosts(accessToken, postIds) {
     const page = await request(`${API_ROOT}/blogs/${BLOG_ID}/posts?${params}`, {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
-    yield* (page.items || []);
+    for (const post of (page.items || [])) yield assertPostTargetsTbb(post);
     pageToken = page.nextPageToken || '';
   } while (pageToken);
 }
 
 async function updatePost(accessToken, post, content) {
-  return request(`${API_ROOT}/blogs/${BLOG_ID}/posts/${post.id}`, {
+  assertPostTargetsTbb(post);
+  const updated = await request(`${API_ROOT}/blogs/${BLOG_ID}/posts/${post.id}`, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -156,11 +178,14 @@ async function updatePost(accessToken, post, content) {
     },
     body: JSON.stringify({ content })
   });
+  return assertPostTargetsTbb(updated);
 }
 
 function ensureApplySafety(args) {
-  if (!args.apply) return;
   if (!BLOG_ID) throw new Error('BLOGGER_BLOG_ID is required');
+  if (!BLOG_URL) throw new Error('BLOGGER_BLOG_URL is required');
+  assertTbbUrl(BLOG_URL, 'BLOGGER_BLOG_URL');
+  if (!args.apply) return;
   if (args.confirmBlogId !== BLOG_ID) {
     throw new Error('Apply blocked: --confirm-blog-id must exactly match BLOGGER_BLOG_ID');
   }
@@ -170,7 +195,6 @@ function ensureApplySafety(args) {
 async function main() {
   const args = parseArgs(process.argv);
   ensureApplySafety(args);
-  if (!BLOG_ID) throw new Error('BLOGGER_BLOG_ID is required');
 
   const token = await getAccessToken();
   const candidates = [];
@@ -191,6 +215,7 @@ async function main() {
   const manifest = [];
 
   for (const { post, result, hasAutomaticChange } of candidates) {
+    assertPostTargetsTbb(post);
     fs.writeFileSync(path.join(runDir, `${post.id}.before.html`), post.content || '');
     fs.writeFileSync(path.join(runDir, `${post.id}.after.html`), result.cleanedHtml);
     const item = {
@@ -213,12 +238,13 @@ async function main() {
     JSON.stringify({
       mode: args.apply ? 'apply' : 'dry-run',
       blogId: BLOG_ID,
+      blogUrl: BLOG_URL,
       generatedAt: new Date().toISOString(),
       posts: manifest
     }, null, 2)
   );
 
-  console.log(`${args.apply ? 'Applied' : 'Dry-run generated for'} ${manifest.length} posts. Output: ${runDir}`);
+  console.log(`${args.apply ? 'Applied' : 'Dry-run generated for'} ${manifest.length} TBB posts. Output: ${runDir}`);
 }
 
 if (require.main === module) {
@@ -228,4 +254,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseArgs, getTypes, removeArticleNodes, serializeJsonLd, cleanJsonLd, ensureApplySafety };
+module.exports = { parseArgs, getTypes, removeArticleNodes, serializeJsonLd, cleanJsonLd, ensureApplySafety, assertTbbUrl, assertPostTargetsTbb };

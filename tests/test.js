@@ -7,7 +7,7 @@ const path = require('path');
 const { lintXML, parseXML } = require('../scripts/xml-lint.js');
 
 const FIXTURES = path.join(__dirname, 'fixtures');
-const PRODUCTION_TEMPLATE = path.join(__dirname, '..', 'asset', 'xml', 'ilmualam.xml');
+const PRODUCTION_TEMPLATE = path.join(__dirname, '..', 'asset', 'xml', 'thebukitbesi.xml');
 
 function loadFixture(name) {
     return fs.readFileSync(path.join(FIXTURES, name), 'utf8');
@@ -82,11 +82,10 @@ test('production template remains well-formed with no fatal lint errors', () => 
     assert.deepEqual(errors, [], `Production XML has fatal errors: ${JSON.stringify(errors)}`);
 });
 
-test('production template has exactly one canonical declaration', () => {
+test('production canonical is delegated to Blogger all-head-content exactly once', () => {
     const xml = loadProductionTemplate();
-    const canonicalCount = countMatches(xml, /rel=['"]canonical['"]/g);
-    assert.equal(canonicalCount, 1, `Expected exactly one canonical declaration, found ${canonicalCount}`);
-    assert.match(xml, /expr:href=['"]data:view\.url\.canonical['"][^>]*rel=['"]canonical['"]|rel=['"]canonical['"][^>]*expr:href=['"]data:view\.url\.canonical['"]/, 'Canonical must use data:view.url.canonical');
+    assert.equal(countMatches(xml, /name=['"]all-head-content['"]/g), 1, 'Expected exactly one all-head-content include');
+    assert.equal(countMatches(xml, /rel=['"]canonical['"]/g), 0, 'Do not add a second manual canonical beside Blogger all-head-content');
 });
 
 test('production robots policy protects search, archive and error views', () => {
@@ -102,14 +101,12 @@ test('production template keeps one robots branch pair and no unconditional noin
     assert.equal(countMatches(xml, /content=['"]noindex, follow['"]/g), 1, 'Expected exactly one noindex directive');
 });
 
-test('production canonical and hreflang consistently use canonical URL object', () => {
+test('production hreflang consistently uses canonical URL object', () => {
     const { doc } = parseXML(loadProductionTemplate());
     const links = Array.from(doc.getElementsByTagName('link'));
-
     const msMyLink = links.find(link => link.getAttribute('hreflang') === 'ms-MY' && link.getAttribute('rel') === 'alternate');
     assert.ok(msMyLink, 'Missing ms-MY hreflang alternate link');
     assert.equal(msMyLink.getAttribute('expr:href'), 'data:view.url.canonical', 'ms-MY hreflang must use data:view.url.canonical');
-
     const xDefaultLink = links.find(link => link.getAttribute('hreflang') === 'x-default' && link.getAttribute('rel') === 'alternate');
     assert.ok(xDefaultLink, 'Missing x-default hreflang alternate link');
     assert.equal(xDefaultLink.getAttribute('expr:href'), 'data:view.url.canonical', 'x-default hreflang must use data:view.url.canonical');
@@ -119,4 +116,23 @@ test('production template does not contain insecure HTTP asset URLs', () => {
     const xml = loadProductionTemplate();
     const insecureAssets = [...xml.matchAll(/(?:src|href)\s*=\s*['"]http:\/\/[^'"]+['"]/g)].map((m) => m[0]);
     assert.deepEqual(insecureAssets, [], `Found insecure asset URLs: ${insecureAssets.join(', ')}`);
+});
+
+test('production template contains no Ilmu Alam cross-site dependency', () => {
+    const xml = loadProductionTemplate();
+    const forbidden = [/ilmualam/i,/theilmualam/i,/ilmualam\.github\.io/i,/ilmualam\.pages\.dev/i,/api\.alquran\.cloud/i,/cdn\.islamic\.network/i,/mp3quran/i];
+    for (const pattern of forbidden) assert.doesNotMatch(xml, pattern, `Forbidden inherited dependency found: ${pattern}`);
+});
+
+test('production template has no jQuery or inherited third-party ad runtime', () => {
+    const xml = loadProductionTemplate();
+    assert.doesNotMatch(xml, /jquery/i, 'TBB clean template must not depend on jQuery');
+    assert.doesNotMatch(xml, /live\.demand\.supply|demand\s*supply/i, 'TBB clean template must not load inherited Demand Supply runtime');
+});
+
+test('production template has one page H1 strategy', () => {
+    const xml = loadProductionTemplate();
+    assert.match(xml, /<h1>Panduan, Direktori &amp; Maklumat Malaysia<\/h1>/, 'Homepage should have the editorial hero H1');
+    assert.match(xml, /<h1><data:post\.title\/><\/h1>/, 'Single posts should use the post title as H1');
+    assert.doesNotMatch(xml, /class=['"]tbb-brand['"][^>]*>\s*<h1/i, 'Header brand must not create another H1');
 });

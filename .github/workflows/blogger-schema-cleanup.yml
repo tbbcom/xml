@@ -1,4 +1,4 @@
-name: Blogger Schema Cleanup
+name: TBB Blogger Schema Cleanup
 
 on:
   workflow_dispatch:
@@ -20,7 +20,7 @@ on:
         required: true
         default: '10'
       confirm_blog_id:
-        description: Required only for apply; must exactly match BLOGGER_BLOG_ID
+        description: Required only for apply; must exactly match TBB_BLOGGER_BLOG_ID
         required: false
         default: ''
 
@@ -39,12 +39,22 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - name: Run guarded cleanup
+      - name: Validate TBB cleanup target
         env:
-          BLOGGER_BLOG_ID: ${{ secrets.BLOGGER_BLOG_ID }}
-          BLOGGER_CLIENT_ID: ${{ secrets.BLOGGER_CLIENT_ID }}
-          BLOGGER_CLIENT_SECRET: ${{ secrets.BLOGGER_CLIENT_SECRET }}
-          BLOGGER_REFRESH_TOKEN: ${{ secrets.BLOGGER_REFRESH_TOKEN }}
+          TBB_BLOG_URL: ${{ secrets.TBB_BLOGGER_BLOG_URL }}
+        run: |
+          set -euo pipefail
+          if [ "${TBB_BLOG_URL}" != "https://www.thebukitbesi.com/" ] && [ "${TBB_BLOG_URL}" != "https://thebukitbesi.com/" ]; then
+            echo "Refusing to run: TBB_BLOGGER_BLOG_URL is missing or not thebukitbesi.com"
+            exit 1
+          fi
+      - name: Run guarded TBB cleanup
+        env:
+          BLOGGER_BLOG_ID: ${{ secrets.TBB_BLOGGER_BLOG_ID }}
+          BLOGGER_BLOG_URL: ${{ secrets.TBB_BLOGGER_BLOG_URL }}
+          BLOGGER_CLIENT_ID: ${{ secrets.TBB_BLOGGER_CLIENT_ID }}
+          BLOGGER_CLIENT_SECRET: ${{ secrets.TBB_BLOGGER_CLIENT_SECRET }}
+          BLOGGER_REFRESH_TOKEN: ${{ secrets.TBB_BLOGGER_REFRESH_TOKEN }}
           MODE: ${{ inputs.mode }}
           POST_IDS: ${{ inputs.post_ids }}
           MAX_POSTS: ${{ inputs.max_posts }}
@@ -61,7 +71,7 @@ jobs:
       - name: Upload backups and manifest
         uses: actions/upload-artifact@v4
         with:
-          name: blogger-schema-cleanup-${{ inputs.mode }}
+          name: tbb-blogger-schema-cleanup-${{ inputs.mode }}
           path: reports/blogger-schema-cleanup/
           if-no-files-found: error
           retention-days: 90
