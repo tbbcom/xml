@@ -51,6 +51,7 @@ jobs:
       - name: Run guarded TBB cleanup
         env:
           BLOGGER_BLOG_ID: ${{ secrets.TBB_BLOGGER_BLOG_ID }}
+          BLOGGER_BLOG_URL: ${{ secrets.TBB_BLOGGER_BLOG_URL }}
           BLOGGER_CLIENT_ID: ${{ secrets.TBB_BLOGGER_CLIENT_ID }}
           BLOGGER_CLIENT_SECRET: ${{ secrets.TBB_BLOGGER_CLIENT_SECRET }}
           BLOGGER_REFRESH_TOKEN: ${{ secrets.TBB_BLOGGER_REFRESH_TOKEN }}
