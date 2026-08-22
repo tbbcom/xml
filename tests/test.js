@@ -82,11 +82,10 @@ test('production template remains well-formed with no fatal lint errors', () => 
     assert.deepEqual(errors, [], `Production XML has fatal errors: ${JSON.stringify(errors)}`);
 });
 
-test('production template has exactly one canonical declaration', () => {
+test('production canonical is delegated to Blogger all-head-content exactly once', () => {
     const xml = loadProductionTemplate();
-    const canonicalCount = countMatches(xml, /rel=['"]canonical['"]/g);
-    assert.equal(canonicalCount, 1, `Expected exactly one canonical declaration, found ${canonicalCount}`);
-    assert.match(xml, /expr:href=['"]data:view\.url\.canonical['"][^>]*rel=['"]canonical['"]|rel=['"]canonical['"][^>]*expr:href=['"]data:view\.url\.canonical['"]/, 'Canonical must use data:view.url.canonical');
+    assert.equal(countMatches(xml, /name=['"]all-head-content['"]/g), 1, 'Expected exactly one all-head-content include');
+    assert.equal(countMatches(xml, /rel=['"]canonical['"]/g), 0, 'Do not add a second manual canonical beside Blogger all-head-content');
 });
 
 test('production robots policy protects search, archive and error views', () => {
@@ -102,14 +101,12 @@ test('production template keeps one robots branch pair and no unconditional noin
     assert.equal(countMatches(xml, /content=['"]noindex, follow['"]/g), 1, 'Expected exactly one noindex directive');
 });
 
-test('production canonical and hreflang consistently use canonical URL object', () => {
+test('production hreflang consistently uses canonical URL object', () => {
     const { doc } = parseXML(loadProductionTemplate());
     const links = Array.from(doc.getElementsByTagName('link'));
-
     const msMyLink = links.find(link => link.getAttribute('hreflang') === 'ms-MY' && link.getAttribute('rel') === 'alternate');
     assert.ok(msMyLink, 'Missing ms-MY hreflang alternate link');
     assert.equal(msMyLink.getAttribute('expr:href'), 'data:view.url.canonical', 'ms-MY hreflang must use data:view.url.canonical');
-
     const xDefaultLink = links.find(link => link.getAttribute('hreflang') === 'x-default' && link.getAttribute('rel') === 'alternate');
     assert.ok(xDefaultLink, 'Missing x-default hreflang alternate link');
     assert.equal(xDefaultLink.getAttribute('expr:href'), 'data:view.url.canonical', 'x-default hreflang must use data:view.url.canonical');
@@ -123,18 +120,8 @@ test('production template does not contain insecure HTTP asset URLs', () => {
 
 test('production template contains no Ilmu Alam cross-site dependency', () => {
     const xml = loadProductionTemplate();
-    const forbidden = [
-        /ilmualam/i,
-        /theilmualam/i,
-        /ilmualam\.github\.io/i,
-        /ilmualam\.pages\.dev/i,
-        /api\.alquran\.cloud/i,
-        /cdn\.islamic\.network/i,
-        /mp3quran/i
-    ];
-    for (const pattern of forbidden) {
-        assert.doesNotMatch(xml, pattern, `Forbidden inherited dependency found: ${pattern}`);
-    }
+    const forbidden = [/ilmualam/i,/theilmualam/i,/ilmualam\.github\.io/i,/ilmualam\.pages\.dev/i,/api\.alquran\.cloud/i,/cdn\.islamic\.network/i,/mp3quran/i];
+    for (const pattern of forbidden) assert.doesNotMatch(xml, pattern, `Forbidden inherited dependency found: ${pattern}`);
 });
 
 test('production template has no jQuery or inherited third-party ad runtime', () => {
